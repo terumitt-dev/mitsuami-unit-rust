@@ -1,25 +1,50 @@
-# template-base
+# mitsuami-unit-rust
 
-新規リポジトリ作成時のベーステンプレート。
+ミツアミ（Mitsuami）は、出自の違う3つのAIが合議して答える、球体の話しかけガジェットです。
+名前は「三つ編み」から取りました。3本を編んで1本にするように、3つの意見をそれぞれの形のまま編み合わせて、1つの答えにします。
 
-## 使い方
+このリポジトリは、3つのユニットのうち「女」です。司令塔から質問を受け取り、賛否と理由を返します。
 
-1. このリポジトリをベースに新規リポジトリを作成
-2. `.drone.yml` の `steps:` に `build` / `deploy` ステップを追加
-3. Drone CI のシークレットを各リポジトリで設定
+## 現在の状態
 
-## CI/CD
+axum の雛形だけがあります。動くのはヘルスチェック（`GET /healthz`）のみで、質問に答える窓口（`POST /judge`）と推論エンジンはこれから作ります。
 
-Drone CI（drone-runner-kube）を使用。このテンプレートは no-op パイプラインのみ定義済み。各リポジトリでステップを追加する。
+## 設計
 
-## AI レビュー
+3つのユニットは、言語、推論エンジン、Webフレームワークをすべて別にしています。司令塔が知っているのは各ユニットのURLと名前だけで、共通の窓口（`POST /judge`）を通してやり取りします。
 
-Claude と Codex が PR を自動レビューする。
+| ユニット | 言語 | 推論エンジン | モデル形式 | Webフレームワーク |
+|---|---|---|---|---|
+| 科学者 | Python | PyTorch（transformers） | safetensors | FastAPI |
+| 母 | Go | llama.cpp | GGUF | 標準の net/http |
+| 女 | Rust | ort（ONNX Runtime） | ONNX | axum |
 
-| Bot | トリガー | Approve |
-|---|---|---|
-| Claude | `@claude` コメント（org メンバー・コラボレーター限定） | 問題なければ自動 Approve |
-| Codex | PR open / `@codex review` コメント | 問題なければ自動 Approve（bridge 経由） |
+モデルは各ユニットが自分で抱えます。モデルのファイルは、このリポジトリには入れません。
 
-- レビューコメントはすべて日本語
-- 設定は `CLAUDE.md`（Claude 用）・`AGENTS.md`（Codex 用）を参照
+## 技術
+
+- Rust 1.100（edition 2024）
+- axum / tokio
+
+## 起動
+
+Docker が必要です。
+
+```sh
+docker build -t mitsuami-unit-rust .
+docker run --rm -p 8080:8080 mitsuami-unit-rust
+curl http://localhost:8080/healthz
+```
+
+待ち受けるポートは、環境変数 `PORT` で変えられます（既定は 8080）。
+
+## 関連リポジトリ
+
+| リポジトリ | 役割 |
+|---|---|
+| [mitsuami-backend](https://github.com/terumitt-dev/mitsuami-backend) | 司令塔。3つのユニットに質問を送り、多数決で結論を返す（Rails） |
+| [mitsuami-frontend](https://github.com/terumitt-dev/mitsuami-frontend) | 画面。質問を送り、賛否と結論を表示する（React） |
+| [mitsuami-unit-python](https://github.com/terumitt-dev/mitsuami-unit-python) | ユニット「科学者」（Python、FastAPI、PyTorch） |
+| [mitsuami-unit-go](https://github.com/terumitt-dev/mitsuami-unit-go) | ユニット「母」（Go、net/http、llama.cpp） |
+| [mitsuami-unit-rust](https://github.com/terumitt-dev/mitsuami-unit-rust) | ユニット「女」（Rust、axum、ONNX Runtime） |
+| mitsuami-personas（非公開） | 人格の定義、学習データ、追加学習と変換のスクリプト |
